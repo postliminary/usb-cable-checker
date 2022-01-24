@@ -1,10 +1,9 @@
 /**
- * Scenarios this circuit needs to test
- * 1. No connection (A =X=> A)
- * 2. Incorrect connection (A ===> B)
- * 3. Bridged connections (A ===> [A,B])
- */
-
+   Scenarios this circuit needs to test
+   1. No connection (A =/=> A)
+   2. Incorrect connection (A ===> B)
+   3. Bridged connections (A ===> [A,B])
+*/
 enum PINS {
   VCC_OUT = 11,
   DATA_POS_OUT = 10,
@@ -13,25 +12,35 @@ enum PINS {
   VCC_IN = 7,
   DATA_POS_IN = 6,
   DATA_NEG_IN = 5,
-  GND_IN = 4, 
+  GND_IN = 4,
   BUTTON = 2
 };
 
 enum CHECKER_STATE {
+  RESET,
   WAITING,
-  START,
-  CHECK_VCC,
-  CHECK_DATA_POS,
-  CHECK_DATA_NEG,
-  CHECK_GND,
-  SUCCESS,
-  ERROR_VCC,
-  ERROR_DATA_POS,
-  ERROR_DATA_NEG,
-  ERROR_GND
+  CHECKING,
+  FAILED
 };
 
+const int USB_OUTPUTS[] = {
+  VCC_OUT,
+  DATA_POS_OUT,
+  DATA_NEG_OUT,
+  GND_OUT
+};
+const int USB_OUTPUTS_COUNT = sizeof(USB_OUTPUTS) / sizeof(USB_OUTPUTS[0]);
+
+const int USB_INPUTS[] = {
+  VCC_IN,
+  DATA_POS_IN,
+  DATA_NEG_IN,
+  GND_IN
+};
+const int USB_INPUTS_COUNT = sizeof(USB_INPUTS) / sizeof(USB_INPUTS[0]);;
+
 int checkerState = WAITING;
+int failure = 0;
 
 void setup() {
   pinMode(VCC_OUT, OUTPUT);
@@ -46,110 +55,66 @@ void setup() {
 }
 
 void loop() {
-  switch(checkerState) {
+  switch (checkerState) {
     case WAITING:
-      waiting();
       break;
-    case START:
-      start();
+    case CHECKING:
+      checkConnections();
       break;
-    case CHECK_VCC:
-      checkConnection(VCC_OUT, VCC_IN, CHECK_DATA_POS, ERROR_VCC);
-      break;
-    case CHECK_DATA_POS:
-      checkConnection(DATA_POS_OUT, DATA_POS_IN, CHECK_DATA_NEG, ERROR_DATA_POS);
-      break;
-    case CHECK_DATA_NEG:
-      checkConnection(DATA_NEG_OUT, DATA_NEG_IN, CHECK_GND, ERROR_DATA_NEG);
-      break;
-    case CHECK_GND:
-      checkConnection(GND_OUT, GND_IN, SUCCESS, ERROR_GND);
-      break;
-    case SUCCESS:
-      success();
-      break;
-    case ERROR_VCC:
-      uhOh(VCC_OUT);
-      break;
-    case ERROR_DATA_POS:
-      uhOh(DATA_POS_OUT);
-      break;
-    case ERROR_DATA_NEG:
-      uhOh(DATA_NEG_OUT);
-      break;
-    case ERROR_GND:
-      uhOh(GND_OUT);
+    case FAILED:
+      uhOh();
       break;
     default:
-      checkerState = WAITING;
+      reset();
       break;
-  }
-}
-
-void waiting() {
-  resetAll();
-}
-
-void start() {
-  checkerState = CHECK_VCC;
-}
-
-void checkConnection(int pinOut, int pinIn, int nextState, int errorState) {
-  resetAll();
-  
-  // Checks for a digital signal between the pins
-  digitalWrite(pinOut, HIGH);
-  delay(500);
-  
-  int connectionState = digitalRead(pinIn);
-  if (connectionState == HIGH) {
-    checkerState = nextState;
-  } else {
-    checkerState = errorState;
-  }
-}
-
-void success() {
-  // Success "animation"
-  digitalWrite(VCC_OUT, HIGH);
-  digitalWrite(DATA_POS_OUT, HIGH);
-  digitalWrite(DATA_NEG_OUT, HIGH);
-  digitalWrite(GND_OUT, HIGH);
-}
-
-const long uhOhInterval = 500;
-unsigned int uhOhTimer = 0;
-int uhOhState = LOW;
-
-void uhOh(int pinOut) {
-  unsigned int currentTimer = millis();
-  if (currentTimer - uhOhTimer >= uhOhInterval) {
-    uhOhTimer = currentTimer;
-
-    if (uhOhState == LOW) {
-      uhOhState = HIGH;
-    } else {
-      uhOhState = LOW;
-    }
-
-    digitalWrite(pinOut, uhOhState);
   }
 }
 
 void buttonHandler() {
-  switch(checkerState) {
-    case SUCCESS:
-      checkerState = WAITING;
-      break;
-    case WAITING:
-      checkerState = START;
-      break;
+  if (checkerState == WAITING) {
+    checkerState = CHECKING;
+  } else {
+    checkerState = RESET;
   }
 }
 
-void resetAll() {
-  digitalWrite(VCC_OUT, LOW);
-  digitalWrite(DATA_POS_OUT, LOW);
-  digitalWrite(DATA_NEG_OUT, LOW);
-  digitalWrite(GND_OUT, LOW);
+void reset() {
+  resetOutputs();
+  failure = 0;
+  checkerState = WAITING;
+}
+
+void checkConnections() {
+  // Iterate through all the outputs
+  for (int i = 0; i < USB_OUTPUTS_COUNT; i++) {
+    resetOutputs();
+    
+    // Check for a HIGH signal for the connection IO pins
+    digitalWrite(USB_OUTPUTS[i], HIGH);
+    delay(500);
+
+    for (int j = 0; j < USB_INPUTS_COUNT; j++) {
+      // Should only read HIGH for matching IN/OUT
+      int assertedState = i == j ? HIGH : LOW;
+      int connectionState = digitalRead(USB_INPUTS[j]);
+      if (connectionState != assertedState) {
+        failure = USB_OUTPUTS[i];
+        checkerState = FAILED;
+        return;
+      }
+    }
+  }
+}
+
+void resetOutputs() {
+  for (int i = 0; i < USB_OUTPUTS_COUNT; i++) {
+    digitalWrite(USB_OUTPUTS[i], LOW);
+  }
+}
+
+void uhOh() {
+  digitalWrite(failure, HIGH);
+  delay(250);
+  digitalWrite(failure, LOW);
+  delay(250);
 }
