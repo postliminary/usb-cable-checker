@@ -1,18 +1,18 @@
 /**
-   Scenarios this circuit needs to test
+   Scenarios this needs to test
    1. No connection (A =/=> A)
    2. Incorrect connection (A ===> B)
    3. Bridged connections (A ===> [A,B])
 */
 enum PINS {
-  VCC_OUT = 11,
-  DATA_POS_OUT = 10,
-  DATA_NEG_OUT = 9,
-  GND_OUT = 8,
-  VCC_IN = 7,
-  DATA_POS_IN = 6,
-  DATA_NEG_IN = 5,
-  GND_IN = 4,
+  VCC_SOURCE = 11,
+  DATA_POS_SOURCE = 10,
+  DATA_NEG_SOURCE = 9,
+  GND_SOURCE = 8,
+  VCC_TARGET = 7,
+  DATA_POS_TARGET = 6,
+  DATA_NEG_TARGET = 5,
+  GND_TARGET = 4,
   BUTTON = 2
 };
 
@@ -23,34 +23,34 @@ enum CHECKER_STATE {
   FAILED
 };
 
-const int USB_OUTPUTS[] = {
-  VCC_OUT,
-  DATA_POS_OUT,
-  DATA_NEG_OUT,
-  GND_OUT
+const int USB_SOURCES[] = {
+  VCC_SOURCE,
+  DATA_POS_SOURCE,
+  DATA_NEG_SOURCE,
+  GND_SOURCE
 };
-const int USB_OUTPUTS_COUNT = sizeof(USB_OUTPUTS) / sizeof(USB_OUTPUTS[0]);
+const int USB_SOURCES_COUNT = sizeof(USB_SOURCES) / sizeof(USB_SOURCES[0]);
 
-const int USB_INPUTS[] = {
-  VCC_IN,
-  DATA_POS_IN,
-  DATA_NEG_IN,
-  GND_IN
+const int USB_TARGETS[] = {
+  VCC_TARGET,
+  DATA_POS_TARGET,
+  DATA_NEG_TARGET,
+  GND_TARGET
 };
-const int USB_INPUTS_COUNT = sizeof(USB_INPUTS) / sizeof(USB_INPUTS[0]);;
+const int USB_TARGETS_COUNT = sizeof(USB_TARGETS) / sizeof(USB_TARGETS[0]);;
 
 int checkerState = WAITING;
 int failure = 0;
 
 void setup() {
-  pinMode(VCC_OUT, OUTPUT);
-  pinMode(DATA_POS_OUT, OUTPUT);
-  pinMode(DATA_NEG_OUT, OUTPUT);
-  pinMode(GND_OUT, OUTPUT);
-  pinMode(VCC_IN, INPUT);
-  pinMode(DATA_POS_IN, INPUT);
-  pinMode(DATA_NEG_IN, INPUT);
-  pinMode(GND_IN, INPUT);
+  pinMode(VCC_SOURCE, OUTPUT);
+  pinMode(DATA_POS_SOURCE, OUTPUT);
+  pinMode(DATA_NEG_SOURCE, OUTPUT);
+  pinMode(GND_SOURCE, OUTPUT);
+  pinMode(VCC_TARGET, INPUT);
+  pinMode(DATA_POS_TARGET, INPUT);
+  pinMode(DATA_NEG_TARGET, INPUT);
+  pinMode(GND_TARGET, INPUT);
   attachInterrupt(digitalPinToInterrupt(BUTTON), buttonHandler, RISING);
 }
 
@@ -79,26 +79,26 @@ void buttonHandler() {
 }
 
 void reset() {
-  resetOutputs();
+  resetSources();
   failure = 0;
   checkerState = WAITING;
 }
 
 void checkConnections() {
-  // Iterate through all the outputs
-  for (int i = 0; i < USB_OUTPUTS_COUNT; i++) {
-    resetOutputs();
+  // Iterate through all the SOURCES
+  for (int i = 0; i < USB_SOURCES_COUNT; i++) {
+    resetSources();
     
     // Check for a HIGH signal for the connection IO pins
-    digitalWrite(USB_OUTPUTS[i], HIGH);
+    digitalWrite(USB_SOURCES[i], HIGH);
     delay(500);
 
-    for (int j = 0; j < USB_INPUTS_COUNT; j++) {
+    for (int j = 0; j < USB_TARGETS_COUNT; j++) {
       // Should only read HIGH for matching IN/OUT
       int assertedState = i == j ? HIGH : LOW;
-      int connectionState = digitalRead(USB_INPUTS[j]);
+      int connectionState = digitalRead(USB_TARGETS[j]);
       if (connectionState != assertedState) {
-        failure = USB_OUTPUTS[i];
+        failure = USB_SOURCES[i];
         checkerState = FAILED;
         return;
       }
@@ -106,9 +106,9 @@ void checkConnections() {
   }
 }
 
-void resetOutputs() {
-  for (int i = 0; i < USB_OUTPUTS_COUNT; i++) {
-    digitalWrite(USB_OUTPUTS[i], LOW);
+void resetSources() {
+  for (int i = 0; i < USB_SOURCES_COUNT; i++) {
+    digitalWrite(USB_SOURCES[i], LOW);
   }
 }
 
